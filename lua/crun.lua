@@ -72,8 +72,19 @@ end
 -- 	})
 -- end
 
-function M.setup(_opts)
-	_opts = _opts or {}
+---@alias CompMode "history" | "path" | "both"
+
+---@class CrunOpts
+---@field completion CompMode
+local defaults = {
+	completion = "path",
+}
+
+---@param opts CrunOpts
+function M.setup(opts)
+	opts = opts or defaults
+
+	local completion_mode = opts.completion or "both"
 
 	if not _G.crun_saved then
 		_G.crun_saved = { last_args = nil, oldargs = {}, process = nil }
@@ -81,11 +92,41 @@ function M.setup(_opts)
 
 	vim.api.nvim_create_user_command("Crun", M.crun, {
 		nargs = "*",
-		complete = function()
-			if not _G.crun_saved then
-				return {}
+		complete = function(arglead, cmdline, _)
+			local saved = _G.crun_saved
+			local completions = {}
+			local seen = {}
+
+			local function add(list)
+				for _, v in ipairs(list) do
+					if not seen[v] then
+						seen[v] = true
+						completions[#completions + 1] = v
+					end
+				end
 			end
-			return vim.iter(_G.crun_saved.oldargs):rev():totable()
+
+			if completion_mode == "path" or completion_mode == "both" then
+				local after_cmd = cmdline:match("^%s*Crun%s+(.*)")
+				local is_first_word = after_cmd == nil or not after_cmd:find("%s")
+				if is_first_word then
+					add(vim.fn.getcompletion(arglead, "shellcmd"))
+				end
+				add(vim.fn.getcompletion(arglead, "file"))
+			end
+
+			if completion_mode == "history" or completion_mode == "both" then
+				if saved then
+					for _, old in ipairs(vim.iter(saved.oldargs):rev():totable()) do
+						if old:sub(1, #arglead) == arglead and not seen[old] then
+							seen[old] = true
+							completions[#completions + 1] = old
+						end
+					end
+				end
+			end
+
+			return completions
 		end,
 	})
 
