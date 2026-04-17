@@ -94,7 +94,7 @@ function M.setup(opts)
 		_G.crun_saved = { last_args = nil, oldargs = {}, process = nil }
 	end
 
-	vim.api.nvim_create_user_command("Crun", M.crun, {
+	vim.api.nvim_create_user_command("Cc", M.crun, {
 		nargs = "*",
 		complete = function(arglead, cmdline, _)
 			local saved = _G.crun_saved
