@@ -3,7 +3,9 @@
 ---@field public Crun function Execute a new program
 ---@field public Ckill function Kill current running program
 ---@field private split_lines function
+---@field private parse_line function
 ---@field private to_qf function
+---@field private qftf function
 ---@field private make_stream_handler function
 local M = {}
 
@@ -35,13 +37,31 @@ local function split_lines(buf, leftover)
 end
 
 ---@type function
+---@param text string
+---@return table
+local function parse_line(text)
+	-- rg --vimgrep: file:line:col:text
+	local file, lnum, col, msg = text:match("^([^:]+):(%d+):(%d+):(.*)")
+	if file then
+		return { filename = file, lnum = tonumber(lnum), col = tonumber(col), text = msg }
+	end
+	-- grep -rn: file:line:text
+	file, lnum, msg = text:match("^([^:]+):(%d+):(.*)")
+	if file then
+		return { filename = file, lnum = tonumber(lnum), text = msg }
+	end
+	-- plain output
+	return { text = text }
+end
+
+---@type function
 ---@param lines table
 ---@param n number
 ---@return table
 local function to_qf(lines, n)
 	local items = {}
 	for i = 1, n do
-		items[i] = { text = lines[i] }
+		items[i] = parse_line(lines[i])
 	end
 	return items
 end
@@ -76,65 +96,41 @@ local function make_stream_handler(args, has_output_ref)
 	end
 end
 
----@alias CompMode "history" | "path" | "both"
----@class CrunOpts
----@field completion CompMode
-local defaults = {
-	completion = "path",
-}
+---@type function
+---@param info table
+---@return table
+function M.qftf(info)
+	local qf = vim.fn.getqflist({ id = info.id, title = 1, items = 1 })
 
----@param opts CrunOpts
----@return nil
-function M.setup(opts)
-	opts = opts or defaults
-
-	local completion_mode = opts.completion or "both"
-
-	if not _G.crun_saved then
-		_G.crun_saved = { last_args = nil, oldargs = {}, process = nil }
+	-- Only apply to Crun quickfix lists
+	if not qf.title or not qf.title:match("^Output:") then
+		-- Replicate default Neovim formatting for other lists
+		local result = {}
+		for i = info.start_idx, info.end_idx do
+			local item = qf.items[i]
+			local fname = item.bufnr > 0 and vim.fn.bufname(item.bufnr) or ""
+			if fname ~= "" then
+				result[#result + 1] = string.format("%s|%d|%s", fname, item.lnum, item.text)
+			else
+				result[#result + 1] = "|| " .. item.text
+			end
+		end
+		return result
 	end
 
-	vim.api.nvim_create_user_command("Cc", M.crun, {
-		nargs = "*",
-		complete = function(arglead, cmdline, _)
-			local saved = _G.crun_saved
-			local completions = {}
-			local seen = {}
-
-			local function add(list)
-				for _, v in ipairs(list) do
-					if not seen[v] then
-						seen[v] = true
-						completions[#completions + 1] = v
-					end
-				end
-			end
-
-			if completion_mode == "path" or completion_mode == "both" then
-				local after_cmd = cmdline:match("^%s*Crun%s+(.*)")
-				local is_first_word = after_cmd == nil or not after_cmd:find("%s")
-				if is_first_word then
-					add(vim.fn.getcompletion(arglead, "shellcmd"))
-				end
-				add(vim.fn.getcompletion(arglead, "file"))
-			end
-
-			if completion_mode == "history" or completion_mode == "both" then
-				if saved then
-					for _, old in ipairs(vim.iter(saved.oldargs):rev():totable()) do
-						if old:sub(1, #arglead) == arglead and not seen[old] then
-							seen[old] = true
-							completions[#completions + 1] = old
-						end
-					end
-				end
-			end
-
-			return completions
-		end,
-	})
-
-	vim.api.nvim_create_user_command("Ckill", M.kill, {})
+	local result = {}
+	for i = info.start_idx, info.end_idx do
+		local item = qf.items[i]
+		local fname = item.bufnr > 0 and vim.fn.bufname(item.bufnr) or ""
+		if fname ~= "" then
+			-- grep/rg results: show location normally
+			result[#result + 1] = string.format("%s|%d|%s", fname, item.lnum, item.text)
+		else
+			-- plain output: just the text, no ||
+			result[#result + 1] = item.text
+		end
+	end
+	return result
 end
 
 ---@type function
@@ -226,6 +222,69 @@ function M.crun(opts)
 			end
 		end)
 	end)
+end
+
+---@alias CompMode "history" | "path" | "both"
+---@class CrunOpts
+---@field completion CompMode
+local defaults = {
+	completion = "path",
+}
+
+---@param opts CrunOpts
+---@return nil
+function M.setup(opts)
+	opts = opts or defaults
+
+	local completion_mode = opts.completion or "both"
+
+	if not _G.crun_saved then
+		_G.crun_saved = { last_args = nil, oldargs = {}, process = nil }
+	end
+
+	vim.api.nvim_create_user_command("Cc", M.crun, {
+		nargs = "*",
+		complete = function(arglead, cmdline, _)
+			local saved = _G.crun_saved
+			local completions = {}
+			local seen = {}
+
+			local function add(list)
+				for _, v in ipairs(list) do
+					if not seen[v] then
+						seen[v] = true
+						completions[#completions + 1] = v
+					end
+				end
+			end
+
+			if completion_mode == "path" or completion_mode == "both" then
+				local after_cmd = cmdline:match("^%s*Crun%s+(.*)")
+				local is_first_word = after_cmd == nil or not after_cmd:find("%s")
+				if is_first_word then
+					add(vim.fn.getcompletion(arglead, "shellcmd"))
+				end
+				add(vim.fn.getcompletion(arglead, "file"))
+			end
+
+			if completion_mode == "history" or completion_mode == "both" then
+				if saved then
+					for _, old in ipairs(vim.iter(saved.oldargs):rev():totable()) do
+						if old:sub(1, #arglead) == arglead and not seen[old] then
+							seen[old] = true
+							completions[#completions + 1] = old
+						end
+					end
+				end
+			end
+
+			return completions
+		end,
+	})
+
+	vim.api.nvim_create_user_command("Ckill", M.kill, {})
+
+	vim.o.quickfixtextfunc = "{info -> v:lua.require('crun').qftf(info)}"
 end
 
 return M
