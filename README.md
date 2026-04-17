@@ -21,8 +21,8 @@ return {
 
 ## Usage
 
-The `Cc` command is available and it will execute any command you give, asynchronously, while it outputs everything in the quickfix list.
-it accepts multiple arguments, so you can run something like:
+The `Cc` command will execute any command you give and asynchronously output the running program's stdout and stderr in the quickfix list.
+It accepts multiple arguments, so you can run something like:
 
 ```command
 :Cc ls -la
@@ -30,7 +30,7 @@ it accepts multiple arguments, so you can run something like:
 
 In order to kill a process that is being run, you can use the `Ckill` command.
 
-The command has been renaed to `Cc` since rust ftp creates a `Crun` command to run cargo so, to avoid confusion, I renamed it this way.
+The command has been renamed to `Cc` since rust ftp creates a `Crun` command to run cargo so, to avoid confusion, I renamed it this way.
 
 ## API
 
