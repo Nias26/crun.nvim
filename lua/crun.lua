@@ -171,7 +171,6 @@ function M.setup(_opts)
 		end
 		---@diagnostic disable-next-line: undefined-field
 		saved.process:kill(15)
-		vim.notify("Crun: sent SIGTERM to " .. (saved.last_args or "?"))
 	end, {})
 end
 
