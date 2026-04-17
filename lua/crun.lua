@@ -1,8 +1,20 @@
+---@class Crun
+---@field public setup function Constructor
+---@field public Crun function Execute a new program
+---@field public Ckill function Kill current running program
+---@field private split_lines function
+---@field private to_qf function
+---@field private make_stream_handler function
 local M = {}
+
 local fn = vim.fn
 local schedule = vim.schedule
 local tbl_contains = vim.tbl_contains
 
+---@type function
+---@param buf string
+---@param leftover string
+---@return table, string
 local function split_lines(buf, leftover)
 	if leftover ~= "" then
 		buf = leftover .. buf
@@ -22,6 +34,10 @@ local function split_lines(buf, leftover)
 	return lines, ""
 end
 
+---@type function
+---@param lines table
+---@param n number
+---@return table
 local function to_qf(lines, n)
 	local items = {}
 	for i = 1, n do
@@ -30,6 +46,10 @@ local function to_qf(lines, n)
 	return items
 end
 
+---@type function
+---@param args string
+---@param has_output_ref table
+---@return function, function
 local function make_stream_handler(args, has_output_ref)
 	local leftover = ""
 	return function(_, data)
@@ -56,24 +76,7 @@ local function make_stream_handler(args, has_output_ref)
 	end
 end
 
--- local function setup_qf_kill_map()
--- 	vim.api.nvim_create_autocmd("BufWinEnter", {
--- 		group = vim.api.nvim_create_augroup("CrunQfKill", { clear = true }),
--- 		callback = function()
--- 			if vim.bo.filetype == "qf" then
--- 				vim.keymap.set(
--- 					"n",
--- 					"K",
--- 					"<cmd>Ckill<cr>",
--- 					{ buffer = true, silent = true, desc = "Kill running Crun process" }
--- 				)
--- 			end
--- 		end,
--- 	})
--- end
-
 ---@alias CompMode "history" | "path" | "both"
-
 ---@class CrunOpts
 ---@field completion CompMode
 local defaults = {
@@ -81,6 +84,7 @@ local defaults = {
 }
 
 ---@param opts CrunOpts
+---@return nil
 function M.setup(opts)
 	opts = opts or defaults
 
@@ -133,6 +137,8 @@ function M.setup(opts)
 	vim.api.nvim_create_user_command("Ckill", M.kill, {})
 end
 
+---@type function
+---@return nil
 function M.kill()
 	local saved = _G.crun_saved
 	if not saved.process then
@@ -143,6 +149,9 @@ function M.kill()
 	saved.process:kill(15)
 end
 
+---@type function
+---@param opts table
+---@return nil
 function M.crun(opts)
 	local saved = _G.crun_saved
 	if saved.process then
@@ -169,6 +178,7 @@ function M.crun(opts)
 		return
 	end
 
+	---@type string
 	local args = opts.args
 	local cmd = vim.split(args, " ", { plain = true })
 
