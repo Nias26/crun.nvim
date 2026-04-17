@@ -1,5 +1,4 @@
 local M = {}
-
 local fn = vim.fn
 local schedule = vim.schedule
 local tbl_contains = vim.tbl_contains
@@ -57,14 +56,38 @@ local function make_stream_handler(args, has_output_ref)
 	end
 end
 
+local function setup_qf_kill_map()
+	vim.api.nvim_create_autocmd("BufWinEnter", {
+		group = vim.api.nvim_create_augroup("CrunQfKill", { clear = true }),
+		callback = function()
+			if vim.bo.filetype == "qf" then
+				vim.keymap.set(
+					"n",
+					"K",
+					"<cmd>Ckill<cr>",
+					{ buffer = true, silent = true, desc = "Kill running Crun process" }
+				)
+			end
+		end,
+	})
+end
+
 function M.setup(_opts)
 	_opts = _opts or {}
 
+	if not _G._crun_saved then
+		_G._crun_saved = { last_args = nil, oldargs = {}, process = nil }
+	end
+	local saved = _G._crun_saved
+
+	setup_qf_kill_map()
+
 	vim.api.nvim_create_user_command("Crun", function(opts)
-		if not _G._crun_saved then
-			_G._crun_saved = { last_args = nil, oldargs = {} }
+		-- Kill any previously running process before starting a new one.
+		if saved.process then
+			saved.process:kill(15)
+			saved.process = nil
 		end
-		local saved = _G._crun_saved
 
 		if opts.args ~= "" then
 			local old = saved.oldargs
@@ -87,16 +110,17 @@ function M.setup(_opts)
 		local args = opts.args
 		local cmd = vim.split(args, " ", { plain = true })
 
-		fn.setqflist({}, "r", { title = "Output: " .. args, items = { { text = "Running…" } } })
+		fn.setqflist({}, "r", { title = "Output: " .. args, items = { { text = "Running..." } } })
 		vim.cmd("copen")
 
 		local has_output = { false }
-
 		local stdout_handler, flush_stdout = make_stream_handler(args, has_output)
 		local stderr_handler, flush_stderr = make_stream_handler(args, has_output)
 
-		vim.system(cmd, { text = true, stdout = stdout_handler, stderr = stderr_handler }, function()
+		saved.process = vim.system(cmd, { text = true, stdout = stdout_handler, stderr = stderr_handler }, function(obj)
 			schedule(function()
+				saved.process = nil
+
 				local tails = {}
 				local so, se = flush_stdout(), flush_stderr()
 				if so ~= "" then
@@ -104,6 +128,16 @@ function M.setup(_opts)
 				end
 				if se ~= "" then
 					tails[#tails + 1] = { text = se }
+				end
+
+				local exit_note
+				if obj.signal ~= 0 then
+					exit_note = ("-- killed (signal %d) --"):format(obj.signal)
+				elseif obj.code ~= 0 then
+					exit_note = ("-- exited with code %d --"):format(obj.code)
+				end
+				if exit_note then
+					tails[#tails + 1] = { text = exit_note }
 				end
 
 				if #tails > 0 then
@@ -129,6 +163,16 @@ function M.setup(_opts)
 			return vim.iter(_G._crun_saved.oldargs):rev():totable()
 		end,
 	})
+
+	vim.api.nvim_create_user_command("Ckill", function()
+		if not saved.process then
+			vim.notify("Crun: no process is running", vim.log.levels.WARN)
+			return
+		end
+		---@diagnostic disable-next-line: undefined-field
+		saved.process:kill(15)
+		vim.notify("Crun: sent SIGTERM to " .. (saved.last_args or "?"))
+	end, {})
 end
 
 return M
