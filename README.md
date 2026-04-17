@@ -18,3 +18,11 @@ return {
     cmd = "Crun",
 }
 ```
+
+## Usage
+
+The `Crun` command is available and it will execute any command you give, asynchronously, while it outputs everything in the quickfix list.
+it accepts multiple arguments, so you can run something like:
+```command
+:Crun ls -la
+```
