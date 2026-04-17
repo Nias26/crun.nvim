@@ -26,3 +26,11 @@ jobs:
           docmappingprojectname: true # Use project name in tag when writing mapping docs
           shiftheadinglevelby: 0 # Shift heading levels by specified number
           incrementheadinglevelby: 0 # Increment heading levels by specified number
+
+      - name: Commit docs
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add doc/
+          git diff --cached --quiet || git commit -m "ci(doc): Update vimdoc"
+          git push
