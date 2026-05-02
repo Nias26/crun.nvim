@@ -1,19 +1,10 @@
 ---@class Crun
----@field public setup function Constructor
----@field public Crun function Execute a new program
----@field public Ckill function Kill current running program
----@field private split_lines function
----@field private parse_line function
----@field private to_qf function
----@field private qftf function
----@field private make_stream_handler function
 local M = {}
 
 local fn = vim.fn
 local schedule = vim.schedule
 local tbl_contains = vim.tbl_contains
 
----@type function
 ---@param buf string
 ---@param leftover string
 ---@return table, string
@@ -36,7 +27,6 @@ local function split_lines(buf, leftover)
 	return lines, ""
 end
 
----@type function
 ---@param text string
 ---@return table
 local function parse_line(text)
@@ -54,7 +44,6 @@ local function parse_line(text)
 	return { text = text }
 end
 
----@type function
 ---@param lines table
 ---@param n number
 ---@return table
@@ -66,7 +55,6 @@ local function to_qf(lines, n)
 	return items
 end
 
----@type function
 ---@param args string
 ---@param has_output_ref table
 ---@return function, function
@@ -96,7 +84,6 @@ local function make_stream_handler(args, has_output_ref)
 	end
 end
 
----@type function
 ---@param info table
 ---@return table
 function M.qftf(info)
@@ -133,7 +120,6 @@ function M.qftf(info)
 	return result
 end
 
----@type function
 ---@return nil
 function M.kill()
 	local saved = _G.crun_saved
@@ -145,7 +131,6 @@ function M.kill()
 	saved.process:kill(15)
 end
 
----@type function
 ---@param opts table
 ---@return nil
 function M.crun(opts)
