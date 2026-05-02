@@ -27,6 +27,8 @@ local function split_lines(buf, leftover)
 	return lines, ""
 end
 
+-- TODO: Fix where the line, col, etc... starts padded with a tab
+-- qf picks it as a ^I
 ---@param text string
 ---@return table
 local function parse_line(text)
