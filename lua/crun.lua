@@ -119,6 +119,9 @@ function M.qftf(info)
 			result[#result + 1] = item.text
 		end
 	end
+
+	vim.wo.colorcolunm = "0"
+
 	return result
 end
 
