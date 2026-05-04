@@ -165,7 +165,9 @@ function M.crun(opts)
 	local args = opts.args
 	local cmd = vim.split(args, " ", { plain = true })
 
-	fn.setqflist({}, "r", { title = "Output: " .. args, items = { { text = "Running..." } } })
+	vim.o.quickfixtextfunc = "{info -> v:lua.require('crun').qftf(info)}"
+
+	fn.setqflist({}, "r", { title = "Crun: " .. args, items = { { text = "Running..." } } })
 	vim.cmd("copen")
 
 	local has_output = { false }
@@ -197,7 +199,7 @@ function M.crun(opts)
 
 			if #tails > 0 then
 				if not has_output[1] then
-					fn.setqflist({}, "r", { title = "Output: " .. args, items = tails })
+					fn.setqflist({}, "r", { title = "Crun: " .. args, items = tails })
 				else
 					fn.setqflist({}, "a", { items = tails })
 				end
@@ -207,6 +209,8 @@ function M.crun(opts)
 			if not has_output[1] then
 				vim.cmd("cclose")
 			end
+
+			vim.o.quickfixtextfunc = saved.qftf
 		end)
 	end)
 end
@@ -226,7 +230,12 @@ function M.setup(opts)
 	local completion_mode = opts.completion or "both"
 
 	if not _G.crun_saved then
-		_G.crun_saved = { last_args = nil, oldargs = {}, process = nil }
+		_G.crun_saved = {
+			last_args = nil,
+			oldargs = {},
+			process = nil,
+			qftf = vim.o.quickfixtextfunc,
+		}
 	end
 
 	vim.api.nvim_create_user_command("Cc", M.crun, {
