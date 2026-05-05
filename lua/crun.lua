@@ -120,7 +120,7 @@ function M.qftf(info)
 		end
 	end
 
-	vim.wo.colorcolunm = "0"
+	vim.wo.colorcolumn = "0"
 
 	return result
 end
