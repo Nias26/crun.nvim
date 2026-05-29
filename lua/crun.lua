@@ -3,132 +3,11 @@ local M = {}
 
 local fn = vim.fn
 local schedule = vim.schedule
-local tbl_contains = vim.tbl_contains
-
----@param buf string
----@param leftover string
----@return table, string
-local function split_lines(buf, leftover)
-	if leftover ~= "" then
-		buf = leftover .. buf
-	end
-	local lines, n = {}, 0
-	local i, len = 1, #buf
-	while i <= len do
-		local nl = string.find(buf, "\n", i, true)
-		if nl then
-			n = n + 1
-			lines[n] = string.sub(buf, i, nl - 1)
-			i = nl + 1
-		else
-			return lines, string.sub(buf, i)
-		end
-	end
-	return lines, ""
-end
-
--- TODO: Fix where the line, col, etc... starts padded with a tab
--- qf picks it as a ^I
----@param text string
----@return table
-local function parse_line(text)
-	-- rg --vimgrep: file:line:col:text
-	local file, lnum, col, msg = text:match("^([^:]+):(%d+):(%d+):(.*)")
-	if file then
-		return { filename = file, lnum = tonumber(lnum), col = tonumber(col), text = msg }
-	end
-	-- grep -rn: file:line:text
-	file, lnum, msg = text:match("^([^:]+):(%d+):(.*)")
-	if file then
-		return { filename = file, lnum = tonumber(lnum), text = msg }
-	end
-	-- plain output
-	return { text = text }
-end
-
----@param lines table
----@param n number
----@return table
-local function to_qf(lines, n)
-	local items = {}
-	for i = 1, n do
-		items[i] = parse_line(lines[i])
-	end
-	return items
-end
-
----@param args string
----@param has_output_ref table
----@return function, function
-local function make_stream_handler(args, has_output_ref)
-	local leftover = ""
-	return function(_, data)
-		if not data then
-			return
-		end
-		schedule(function()
-			local lines, tail = split_lines(data, leftover)
-			leftover = tail
-			local n = #lines
-			if n == 0 then
-				return
-			end
-			local items = to_qf(lines, n)
-			if not has_output_ref[1] then
-				has_output_ref[1] = true
-				fn.setqflist({}, "r", { title = "Output: " .. args, items = items })
-			else
-				fn.setqflist({}, "a", { items = items })
-			end
-		end)
-	end, function()
-		return leftover
-	end
-end
-
----@param info table
----@return table
-function M.qftf(info)
-	local qf = vim.fn.getqflist({ id = info.id, title = 1, items = 1 })
-
-	-- Only apply to Crun quickfix lists
-	if not qf.title or not qf.title:match("^Output:") then
-		-- Replicate default Neovim formatting for other lists
-		local result = {}
-		for i = info.start_idx, info.end_idx do
-			local item = qf.items[i]
-			local fname = item.bufnr > 0 and vim.fn.bufname(item.bufnr) or ""
-			if fname ~= "" then
-				result[#result + 1] = string.format("%s|%d|%s", fname, item.lnum, item.text)
-			else
-				result[#result + 1] = "|| " .. item.text
-			end
-		end
-		return result
-	end
-
-	local result = {}
-	for i = info.start_idx, info.end_idx do
-		local item = qf.items[i]
-		local fname = item.bufnr > 0 and vim.fn.bufname(item.bufnr) or ""
-		if fname ~= "" then
-			-- grep/rg results: show location normally
-			result[#result + 1] = string.format("%s|%d|%s", fname, item.lnum, item.text)
-		else
-			-- plain output: just the text, no ||
-			result[#result + 1] = item.text
-		end
-	end
-
-	vim.wo.colorcolumn = "0"
-
-	return result
-end
 
 ---@return nil
 function M.kill()
 	local saved = _G.crun_saved
-	if not saved.process then
+	if not saved or not saved.process then
 		vim.notify("Crun: no process is running", vim.log.levels.WARN)
 		return
 	end
@@ -140,6 +19,7 @@ end
 ---@return nil
 function M.crun(opts)
 	local saved = _G.crun_saved
+
 	if saved.process then
 		---@diagnostic disable-next-line: undefined-field
 		saved.process:kill(15)
@@ -148,7 +28,7 @@ function M.crun(opts)
 
 	if opts.args ~= "" then
 		local old = saved.oldargs
-		if not tbl_contains(old, opts.args) then
+		if not vim.tbl_contains(old, opts.args) then
 			if #old >= 20 then
 				table.remove(old, 1)
 			end
@@ -160,60 +40,86 @@ function M.crun(opts)
 	end
 
 	if not opts.args or opts.args == "" then
-		print("No command to execute")
+		vim.notify("Crun: no command to execute", vim.log.levels.WARN)
 		return
 	end
 
-	---@type string
 	local args = opts.args
-	local cmd = vim.split(args, " ", { plain = true })
+	local cmd = fn.split(args)
 
-	vim.o.quickfixtextfunc = "{info -> v:lua.require('crun').qftf(info)}"
+	local efm = vim.o.errorformat
 
-	fn.setqflist({}, "r", { title = "Crun: " .. args, items = { { text = "Running..." } } })
+	local tmp = fn.tempname()
+	local tmpfile = io.open(tmp, "w")
+	if not tmpfile then
+		vim.notify("Crun: could not create temp file", vim.log.levels.ERROR)
+		return
+	end
+
+	fn.setqflist({}, "r", { title = args, items = { { text = "Running: " .. args } } })
 	vim.cmd("copen")
 
-	local has_output = { false }
-	local stdout_handler, flush_stdout = make_stream_handler(args, has_output)
-	local stderr_handler, flush_stderr = make_stream_handler(args, has_output)
+	for _, win in ipairs(fn.getwininfo()) do
+		if win.quickfix == 1 then
+			vim.wo[win.winid].colorcolumn = "0"
+			break
+		end
+	end
 
-	saved.process = vim.system(cmd, { text = true, stdout = stdout_handler, stderr = stderr_handler }, function(obj)
+	saved.process = vim.system(cmd, {
+		text = true,
+		stdout = function(_, data)
+			if data then
+				tmpfile:write(data)
+			end
+		end,
+		stderr = function(_, data)
+			if data then
+				tmpfile:write(data)
+			end
+		end,
+	}, function(obj)
+		tmpfile:close()
+
 		schedule(function()
 			saved.process = nil
 
-			local tails = {}
-			local so, se = flush_stdout(), flush_stderr()
-			if so ~= "" then
-				tails[#tails + 1] = { text = so }
-			end
-			if se ~= "" then
-				tails[#tails + 1] = { text = se }
-			end
+			local save_efm = vim.o.errorformat
+			vim.o.errorformat = efm
+			vim.cmd("cgetfile " .. fn.fnameescape(tmp))
+			vim.o.errorformat = save_efm
+			os.remove(tmp)
 
-			local exit_note
+			fn.setqflist({}, "a", { title = args })
+
+			local status
 			if obj.signal ~= 0 then
-				exit_note = ("-- killed (signal %d) --"):format(obj.signal)
+				status = ("-- killed (signal %d) --"):format(obj.signal)
 			elseif obj.code ~= 0 then
-				exit_note = ("-- exited with code %d --"):format(obj.code)
+				status = ("-- exited with code %d --"):format(obj.code)
+			else
+				status = "-- done --"
 			end
-			if exit_note then
-				tails[#tails + 1] = { text = exit_note }
-			end
+			fn.setqflist({}, "a", {
+				items = {
+					{ text = "" },
+					{ text = status },
+				},
+			})
 
-			if #tails > 0 then
-				if not has_output[1] then
-					fn.setqflist({}, "r", { title = "Crun: " .. args, items = tails })
-				else
-					fn.setqflist({}, "a", { items = tails })
-				end
-				has_output[1] = true
-			end
-
-			if not has_output[1] then
+			local qf = fn.getqflist()
+			if #qf == 1 and qf[1].text == status then
 				vim.cmd("cclose")
+				vim.notify("Crun: " .. status, vim.log.levels.INFO)
 			end
 
-			vim.o.quickfixtextfunc = saved.qftf
+			---@diagnostic disable-next-line: undefined-field, need-check-nil
+			vim.o.makeprg = args:gsub(" ", "\\ ")
+
+			vim.api.nvim_exec_autocmds("User", {
+				pattern = "CrunPost",
+				data = args,
+			})
 		end)
 	end)
 end
@@ -228,16 +134,15 @@ local defaults = {
 ---@param opts CrunOpts
 ---@return nil
 function M.setup(opts)
-	opts = opts or defaults
+	opts = vim.tbl_deep_extend("force", defaults, opts or {})
 
-	local completion_mode = opts.completion or "both"
+	local completion_mode = opts.completion
 
 	if not _G.crun_saved then
 		_G.crun_saved = {
 			last_args = nil,
 			oldargs = {},
 			process = nil,
-			qftf = vim.o.quickfixtextfunc,
 		}
 	end
 
@@ -249,7 +154,7 @@ function M.setup(opts)
 			local seen = {}
 
 			if completion_mode == "path" or completion_mode == "both" then
-				for _, v in ipairs(vim.fn.getcompletion(arglead, "file")) do
+				for _, v in ipairs(fn.getcompletion(arglead, "file")) do
 					if not seen[v] then
 						seen[v] = true
 						completions[#completions + 1] = v
@@ -258,12 +163,10 @@ function M.setup(opts)
 			end
 
 			if completion_mode == "history" or completion_mode == "both" then
-				if saved then
-					for _, old in ipairs(vim.iter(saved.oldargs):rev():totable()) do
-						if old:sub(1, #arglead) == arglead and not seen[old] then
-							seen[old] = true
-							completions[#completions + 1] = old
-						end
+				for _, old in ipairs(vim.iter(saved.oldargs):rev():totable()) do
+					if old:sub(1, #arglead) == arglead and not seen[old] then
+						seen[old] = true
+						completions[#completions + 1] = old
 					end
 				end
 			end
@@ -274,7 +177,20 @@ function M.setup(opts)
 
 	vim.api.nvim_create_user_command("Ckill", M.kill, {})
 
-	vim.o.quickfixtextfunc = "{info -> v:lua.require('crun').qftf(info)}"
+	vim.api.nvim_create_autocmd("OptionSet", {
+		pattern = "makeprg",
+		callback = function()
+			local saved = _G.crun_saved
+			if not saved then
+				return
+			end
+			local mp = vim.o.makeprg
+			mp = mp:gsub("\\ ", " ")
+			if mp ~= "" and mp ~= "make" then
+				saved.last_args = mp
+			end
+		end,
+	})
 end
 
 return M
