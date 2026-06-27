@@ -1,3 +1,8 @@
+-- TODO: 2026-06-27 16:48 - Nias: Use normal buffer instead of qf
+-- TODO: 2026-06-27 16:48 - Nias: use errorformat
+-- TODO: 2026-06-27 16:48 - Nias: Support colors
+-- TODO: 2026-06-27 16:48 - Nias: Change text on start, end, and buffer name
+-- TODO: 2026-06-27 16:49 - Nias: Make use of plenary.nvim for async tasks
 ---@class Crun
 local M = {}
 
