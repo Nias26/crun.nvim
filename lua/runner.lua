@@ -25,7 +25,9 @@ local function fmt_elapsed(seconds)
 end
 
 ---@param args_str string  command that was run, used as the quickfix title
-local function populate_quickfix(args_str)
+---@param first    integer 0-indexed first line of the job's actual output (inclusive)
+---@param last     integer 0-indexed last line of the job's actual output (exclusive)
+local function populate_quickfix(args_str, first, last)
 	local qcfg = config.current.quickfix
 	if not qcfg or not qcfg.enabled then
 		return
@@ -36,7 +38,7 @@ local function populate_quickfix(args_str)
 		return
 	end
 
-	local lines = api.nvim_buf_get_lines(bufid, 0, -1, false)
+	local lines = api.nvim_buf_get_lines(bufid, first, last, false)
 	local efm = config.current.errorformat or vim.o.errorformat
 
 	fn.setqflist({}, " ", {
@@ -105,6 +107,9 @@ function M.run(args_str)
 		buf.send(("-- Crun started at %s --\r\n\r\n"):format(clock()))
 	end
 
+	-- everything from here on is the job's own output, until on_exit marks the end
+	local output_start = api.nvim_buf_line_count(buf.get())
+
 	local env
 	if config.current.color then
 		env = {
@@ -128,6 +133,8 @@ function M.run(args_str)
 			job_id = -1
 
 			local elapsed = (vim.loop.hrtime() - hr_start) / 1e9
+			-- mark the end of the job's own output before we append our banner
+			local output_end = api.nvim_buf_line_count(buf.get())
 
 			if config.current.timestamps then
 				local status = code == 0 and "finished" or ("exited with code %d"):format(code)
@@ -144,7 +151,7 @@ function M.run(args_str)
 
 			-- defer so the terminal buffer has flushed the lines above before we read them
 			vim.schedule(function()
-				populate_quickfix(args_str)
+				populate_quickfix(args_str, output_start, output_end)
 			end)
 
 			api.nvim_exec_autocmds("User", { pattern = "CrunPost", data = args_str })
