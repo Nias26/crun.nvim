@@ -18,6 +18,7 @@
 ---@field errorformat string|nil      errorformat used to parse output; nil = current &errorformat
 ---@field quickfix    CrunQuickfixOpts
 ---@field window      CrunWinOpts
+---@field echo        boolean         echo the command inside the buffer
 
 local M = {}
 
@@ -37,6 +38,7 @@ M.defaults = {
 		width = 80,
 		name = "[Crun]",
 	},
+	echo = false,
 }
 
 ---@type CrunOpts

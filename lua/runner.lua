@@ -8,6 +8,10 @@ local M = {}
 
 local job_id = -1
 
+local ANSI_GREEN = "\27[38;2;80;200;120m"
+local ANSI_RED = "\27[38;2;220;60;60m"
+local ANSI_RESET = "\27[0m"
+
 ---@return string | osdate
 local function clock()
 	return os.date("%a %b %d %H:%M:%S")
@@ -99,7 +103,9 @@ function M.run(args_str)
 		end
 	end)
 
-	buf.send("~> " .. args_str .. "\r\n")
+	if config.current.echo then
+		buf.send("~> " .. args_str .. "\r\n")
+	end
 
 	local hr_start = vim.loop.hrtime()
 
@@ -138,14 +144,25 @@ function M.run(args_str)
 
 			if config.current.timestamps then
 				local status = code == 0 and "finished" or ("exited with code %d"):format(code)
-				local banner = ("\r\n-- Crun %s at %s (elapsed %s) --\r\n"):format(
+				local color
+				if code == 0 then
+					color = vim.o.termguicolors and ANSI_GREEN or "\27[32m"
+				else
+					color = vim.o.termguicolors and ANSI_RED or "\27[31m"
+				end
+				local banner = ("\r\n-- Crun %s%s%s at %s (elapsed %s) --\r\n"):format(
+					color,
 					status,
+					ANSI_RESET,
 					clock(),
 					fmt_elapsed(elapsed)
 				)
 				api.nvim_chan_send(chanid, banner)
 			else
-				local status = code == 0 and "-- done --" or ("-- exited with code %d --"):format(code)
+				local green = vim.o.termguicolors and ANSI_GREEN or "\27[32m"
+				local red = vim.o.termguicolors and ANSI_RED or "\27[31m"
+				local status = code == 0 and "-- " .. green .. "done" .. ANSI_RESET .. " --"
+					or ("-- " .. red .. "exited with code %d" .. ANSI_RESET .. " --"):format(code)
 				api.nvim_chan_send(chanid, "\r\n" .. status .. "\r\n")
 			end
 
