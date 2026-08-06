@@ -28,43 +28,6 @@ local function fmt_elapsed(seconds)
 	return ("%dm %.1fs"):format(m, s)
 end
 
----@param args_str string  command that was run, used as the quickfix title
----@param first    integer 0-indexed first line of the job's actual output (inclusive)
----@param last     integer 0-indexed last line of the job's actual output (exclusive)
-local function populate_quickfix(args_str, first, last)
-	local qcfg = config.current.quickfix
-	if not qcfg or not qcfg.enabled then
-		return
-	end
-
-	local bufid = buf.get()
-	if bufid == -1 or not api.nvim_buf_is_valid(bufid) then
-		return
-	end
-
-	local lines = api.nvim_buf_get_lines(bufid, first, last, false)
-	local efm = config.current.errorformat or vim.o.errorformat
-
-	fn.setqflist({}, " ", {
-		title = args_str,
-		lines = lines,
-		efm = efm,
-	})
-
-	local count = #fn.getqflist()
-	if count > 0 then
-		vim.notify(("Crun: %d error(s) found"):format(count), vim.log.levels.WARN)
-		if qcfg.open then
-			vim.cmd("copen")
-			-- keep focus on the crun window/buffer rather than the quickfix list
-			local wid = win.find()
-			if wid ~= -1 then
-				api.nvim_set_current_win(wid)
-			end
-		end
-	end
-end
-
 function M.kill()
 	if job_id > 0 then
 		fn.jobstop(job_id)
@@ -104,7 +67,7 @@ function M.run(args_str)
 	end)
 
 	if config.current.echo then
-		buf.send("~> " .. args_str .. "\r\n")
+		buf.send("Running: " .. args_str .. "\r\n")
 	end
 
 	local hr_start = vim.loop.hrtime()
@@ -112,9 +75,6 @@ function M.run(args_str)
 	if config.current.timestamps then
 		buf.send(("-- Crun started at %s --\r\n\r\n"):format(clock()))
 	end
-
-	-- everything from here on is the job's own output, until on_exit marks the end
-	local output_start = api.nvim_buf_line_count(buf.get())
 
 	local env
 	if config.current.color then
@@ -139,8 +99,6 @@ function M.run(args_str)
 			job_id = -1
 
 			local elapsed = (vim.loop.hrtime() - hr_start) / 1e9
-			-- mark the end of the job's own output before we append our banner
-			local output_end = api.nvim_buf_line_count(buf.get())
 
 			if config.current.timestamps then
 				local status = code == 0 and "finished" or ("exited with code %d"):format(code)
@@ -165,11 +123,6 @@ function M.run(args_str)
 					or ("-- " .. red .. "exited with code %d" .. ANSI_RESET .. " --"):format(code)
 				api.nvim_chan_send(chanid, "\r\n" .. status .. "\r\n")
 			end
-
-			-- defer so the terminal buffer has flushed the lines above before we read them
-			vim.schedule(function()
-				populate_quickfix(args_str, output_start, output_end)
-			end)
 
 			api.nvim_exec_autocmds("User", { pattern = "CrunPost", data = args_str })
 		end,

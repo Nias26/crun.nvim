@@ -2,22 +2,16 @@
 ---@alias CompMode "history" | "path" | "both"
 
 ---@class CrunWinOpts
----@field position WinPosition
----@field height   integer
----@field width    integer
----@field name     string
-
----@class CrunQuickfixOpts
----@field enabled boolean  parse output into the quickfix list on exit
----@field open    boolean  auto-open the quickfix window when errors are found
+---@field position WinPosition        window position
+---@field height   integer            window height
+---@field width    integer            window width
+---@field name     string             window name
 
 ---@class CrunOpts
----@field completion  CompMode
+---@field completion  CompMode        what completion to show
 ---@field timestamps  boolean         print start/finish banners like Emacs compile mode
 ---@field color       boolean         force color output from the child process
----@field errorformat string|nil      errorformat used to parse output; nil = current &errorformat
----@field quickfix    CrunQuickfixOpts
----@field window      CrunWinOpts
+---@field window      CrunWinOpts     window options
 ---@field echo        boolean         echo the command inside the buffer
 
 local M = {}
@@ -27,11 +21,6 @@ M.defaults = {
 	completion = "path",
 	timestamps = true,
 	color = true,
-	errorformat = nil,
-	quickfix = {
-		enabled = true,
-		open = false,
-	},
 	window = {
 		position = "bottom",
 		height = 15,

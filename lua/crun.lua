@@ -27,26 +27,6 @@ function M.toggle()
 	win.toggle()
 end
 
----@param direction "next"|"prev"
-local function goto_error(direction)
-	local ok, err = pcall(vim.cmd, direction == "next" and "cnext" or "cprevious")
-	if not ok then
-		vim.notify("Crun: " .. err:gsub("^.-:%d+: ", ""), vim.log.levels.WARN)
-	end
-end
-
-function M.next_error()
-	goto_error("next")
-end
-
-function M.prev_error()
-	goto_error("prev")
-end
-
-function M.qf()
-	vim.cmd("copen")
-end
-
 ---@param user_opts CrunOpts
 function M.setup(user_opts)
 	config.set(user_opts)
@@ -62,9 +42,6 @@ function M.setup(user_opts)
 
 	vim.api.nvim_create_user_command("Ckill", M.kill, {})
 	vim.api.nvim_create_user_command("Ctoggle", M.toggle, {})
-	vim.api.nvim_create_user_command("Cnext", M.next_error, {})
-	vim.api.nvim_create_user_command("Cprev", M.prev_error, {})
-	vim.api.nvim_create_user_command("Cqf", M.qf, {})
 end
 
 return M

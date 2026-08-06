@@ -40,6 +40,7 @@ local function apply_win_opts(wid)
 	wo.colorcolumn = "0"
 	wo.wrap = false
 	wo.winfixheight = true
+	vim.keymap.set("n", "Q", M.toggle, { buf = buf.get(), nowait = true, silent = true })
 end
 
 ---@return integer winid
@@ -63,7 +64,7 @@ function M.open()
 		local ui = api.nvim_list_uis()[1]
 		local row = math.floor((ui.height - h) / 2)
 		local col = math.floor((ui.width - w) / 2)
-		wid = api.nvim_open_win(bid, false, {
+		wid = api.nvim_open_win(bid, true, {
 			relative = "editor",
 			row = row,
 			col = col,
@@ -82,7 +83,7 @@ function M.open()
 			right = "right",
 		})[pos] or "below"
 
-		wid = api.nvim_open_win(bid, false, { split = split_dir, win = 0 })
+		wid = api.nvim_open_win(bid, true, { split = split_dir, win = 0 })
 
 		if pos == "bottom" or pos == "top" then
 			api.nvim_win_set_height(wid, h)
