@@ -108,7 +108,7 @@ function M.run(args_str)
 				else
 					color = vim.o.termguicolors and ANSI_RED or "\27[31m"
 				end
-				local banner = ("\r\n-- Crun %s%s%s at %s (elapsed %s) --\r\n"):format(
+				local banner = ("\n\r\n-- Crun %s%s%s at %s (elapsed %s) --\r\n"):format(
 					color,
 					status,
 					ANSI_RESET,
