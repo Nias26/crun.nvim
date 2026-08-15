@@ -7,6 +7,7 @@ local fn = vim.fn
 local M = {}
 
 local job_id = -1
+local queue = {}
 
 local ANSI_GREEN = "\27[38;2;80;200;120m"
 local ANSI_RED = "\27[38;2;220;60;60m"
@@ -29,6 +30,7 @@ local function fmt_elapsed(seconds)
 end
 
 function M.kill()
+	queue = {}
 	if job_id > 0 then
 		fn.jobstop(job_id)
 		vim.notify("Crun: killed", vim.log.levels.WARN)
@@ -45,10 +47,16 @@ end
 ---@param args_str string  full command string
 function M.run(args_str)
 	if job_id > 0 then
-		fn.jobstop(job_id)
-		job_id = -1
+		table.insert(queue, args_str)
+		vim.notify("Crun: queued: " .. args_str, vim.log.levels.INFO)
+		return
 	end
 
+	M.exec(args_str)
+end
+
+---@param args_str string  full command string
+function M.exec(args_str)
 	local argv = fn.split(args_str)
 	local command = argv[1]
 	if not command or fn.executable(command) == 0 then
@@ -56,15 +64,23 @@ function M.run(args_str)
 		return
 	end
 
+	-- Reuses the existing terminal buffer/window when one is already
+	-- open; only creates/opens them when they don't exist yet.
 	buf.prepare()
 
-	win.open()
+	if not win.is_open() then
+		win.open()
+	end
 
-	local chanid = buf.open_term(function(data)
-		if job_id > 0 then
-			fn.chansend(job_id, data)
-		end
-	end)
+	local chanid = buf.chan()
+	if not chanid or not buf.is_open() or not buf.is_valid() then
+    print("[*] Opening a new terminal")
+		chanid = buf.open_term(function(data)
+			if job_id > 0 then
+				fn.chansend(job_id, data)
+			end
+		end)
+	end
 
 	if config.current.echo then
 		buf.send("Running: " .. args_str .. "\r\n")
@@ -85,7 +101,7 @@ function M.run(args_str)
 		}
 	end
 
-	job_id = fn.jobstart(argv, {
+	job_id = fn.jobstart(args_str, {
 		pty = true,
 		width = win.width(),
 		env = env,
@@ -125,6 +141,13 @@ function M.run(args_str)
 			end
 
 			api.nvim_exec_autocmds("User", { pattern = "CrunPost", data = args_str })
+
+			local next_cmd = table.remove(queue, 1)
+			if next_cmd then
+				vim.schedule(function()
+					M.exec(next_cmd)
+				end)
+			end
 		end,
 	})
 
@@ -135,6 +158,7 @@ function M.run(args_str)
 	end
 
 	buf.on_close(function()
+		queue = {}
 		if job_id > 0 then
 			fn.jobstop(job_id)
 			job_id = -1

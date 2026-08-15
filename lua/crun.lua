@@ -35,13 +35,14 @@ function M.setup(user_opts)
 
 	vim.api.nvim_create_user_command("Cc", M.run, {
 		nargs = "*",
+		bar = true,
 		complete = function(arglead)
 			return history.complete(arglead, mode)
 		end,
 	})
 
-	vim.api.nvim_create_user_command("Ckill", M.kill, {})
-	vim.api.nvim_create_user_command("Ctoggle", M.toggle, {})
+	vim.api.nvim_create_user_command("Ckill", M.kill, { bar = true })
+	vim.api.nvim_create_user_command("Ctoggle", M.toggle, { bar = true })
 end
 
 return M
