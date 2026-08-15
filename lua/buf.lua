@@ -56,6 +56,12 @@ function M.send(data)
 	end
 end
 
+function M.clear()
+	if chanid > 0 then
+		api.nvim_chan_send(chanid, "\27[3J\27[2J\27[H")
+	end
+end
+
 function M.scroll_to_bottom()
 	if not M.is_valid() then
 		return
@@ -86,7 +92,7 @@ end
 
 ---@return boolean
 function M.is_open()
-  return chanid ~= -1
+	return chanid ~= -1
 end
 
 return M

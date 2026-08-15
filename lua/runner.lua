@@ -48,10 +48,11 @@ end
 function M.run(args_str)
 	if job_id > 0 then
 		table.insert(queue, args_str)
-		vim.notify("Crun: queued: " .. args_str, vim.log.levels.INFO)
+		-- vim.notify("Crun: queued: " .. args_str, vim.log.levels.INFO)
 		return
 	end
 
+	buf.clear()
 	M.exec(args_str)
 end
 
@@ -64,8 +65,6 @@ function M.exec(args_str)
 		return
 	end
 
-	-- Reuses the existing terminal buffer/window when one is already
-	-- open; only creates/opens them when they don't exist yet.
 	buf.prepare()
 
 	if not win.is_open() then
@@ -74,7 +73,6 @@ function M.exec(args_str)
 
 	local chanid = buf.chan()
 	if not chanid or not buf.is_open() or not buf.is_valid() then
-    print("[*] Opening a new terminal")
 		chanid = buf.open_term(function(data)
 			if job_id > 0 then
 				fn.chansend(job_id, data)
@@ -124,7 +122,7 @@ function M.exec(args_str)
 				else
 					color = vim.o.termguicolors and ANSI_RED or "\27[31m"
 				end
-				local banner = ("\n\r\n-- Crun %s%s%s at %s (elapsed %s) --\r\n"):format(
+				local banner = ("\n\r\n-- Crun %s%s%s at %s (elapsed %s) --\r\n\n"):format(
 					color,
 					status,
 					ANSI_RESET,
@@ -137,7 +135,7 @@ function M.exec(args_str)
 				local red = vim.o.termguicolors and ANSI_RED or "\27[31m"
 				local status = code == 0 and "-- " .. green .. "done" .. ANSI_RESET .. " --"
 					or ("-- " .. red .. "exited with code %d" .. ANSI_RESET .. " --"):format(code)
-				api.nvim_chan_send(chanid, "\r\n" .. status .. "\r\n")
+				api.nvim_chan_send(chanid, "\r\n" .. status .. "\r\n\n")
 			end
 
 			api.nvim_exec_autocmds("User", { pattern = "CrunPost", data = args_str })
