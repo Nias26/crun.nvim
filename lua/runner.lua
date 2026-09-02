@@ -44,12 +44,23 @@ function M.is_running()
 	return job_id > 0
 end
 
----@param args_str string  full command string
+---@param args_str string full command string
 function M.run(args_str)
-	if job_id > 0 then
-		table.insert(queue, args_str)
-		-- vim.notify("Crun: queued: " .. args_str, vim.log.levels.INFO)
-		return
+	if M.is_running() then
+		if not config.current.queue then
+			local input = vim.fn.input("A task is still running. Do you want to kill it? (y/n): ")
+			if input == "y" or input == "yes" then
+				M.kill()
+        -- wait some time otherwise buf won't clean
+        vim.wait(1)
+			elseif input == "n" or input == "no" then
+				return
+			end
+		else
+			table.insert(queue, args_str)
+			vim.notify("Crun: queued: " .. args_str, vim.log.levels.INFO)
+			return
+		end
 	end
 
 	buf.clear()

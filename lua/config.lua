@@ -13,6 +13,7 @@
 ---@field color       boolean         force color output from the child process
 ---@field window      CrunWinOpts     window options
 ---@field echo        boolean         echo the command inside the buffer
+---@field queue       boolean         queue commands instead of asking to kill
 
 local M = {}
 
@@ -28,6 +29,7 @@ M.defaults = {
 		name = "[Crun]",
 	},
 	echo = false,
+  queue = false,
 }
 
 ---@type CrunOpts
