@@ -130,12 +130,24 @@ function M.exec(args_str)
 					fmt_elapsed(elapsed)
 				)
 				api.nvim_chan_send(chanid, banner)
+
+				if code ~= 0 then
+					buf.update_name("(Exited)")
+				else
+					buf.update_name("(Finished)")
+				end
 			else
 				local green = vim.o.termguicolors and ANSI_GREEN or "\27[32m"
 				local red = vim.o.termguicolors and ANSI_RED or "\27[31m"
 				local status = code == 0 and "-- " .. green .. "done" .. ANSI_RESET .. " --"
 					or ("-- " .. red .. "exited with code %d" .. ANSI_RESET .. " --"):format(code)
 				api.nvim_chan_send(chanid, "\r\n" .. status .. "\r\n\n")
+
+				if code ~= 0 then
+					buf.update_name("(Exited)")
+				else
+					buf.update_name("(Finished)")
+				end
 			end
 
 			api.nvim_exec_autocmds("User", { pattern = "CrunPost", data = args_str })
@@ -154,6 +166,8 @@ function M.exec(args_str)
 		vim.notify("Crun: failed to start: " .. args_str, vim.log.levels.ERROR)
 		return
 	end
+
+	buf.update_name("(Running)")
 
 	buf.on_close(function()
 		queue = {}

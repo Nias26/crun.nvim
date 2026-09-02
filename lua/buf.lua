@@ -21,6 +21,11 @@ function M.chan()
 	return chanid
 end
 
+---@param title string The new title of the window
+function M.update_name(title)
+  api.nvim_buf_set_name(bufid, config.current.window.name .. " " .. title)
+end
+
 ---@return integer bufid
 function M.prepare()
 	if M.is_valid() then
