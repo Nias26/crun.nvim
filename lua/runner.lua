@@ -53,6 +53,10 @@ function M.run(args_str)
 				M.kill()
         -- wait some time otherwise buf won't clean
         vim.wait(1)
+        if M.is_running() then
+          error("Job is still running after kill. Aborting")
+          return
+        end
 			elseif input == "n" or input == "no" then
 				return
 			end
