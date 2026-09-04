@@ -6,6 +6,7 @@
 ---@field height   integer            window height
 ---@field width    integer            window width
 ---@field name     string             window name
+---@field focus    boolean            focus on window upon opening
 
 ---@class CrunOpts
 ---@field completion  CompMode        what completion to show
@@ -27,6 +28,7 @@ M.defaults = {
 		height = 15,
 		width = 80,
 		name = "[Crun]",
+    focus = true,
 	},
 	echo = false,
   queue = false,

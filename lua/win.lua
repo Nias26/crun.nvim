@@ -64,7 +64,7 @@ function M.open()
 		local ui = api.nvim_list_uis()[1]
 		local row = math.floor((ui.height - h) / 2)
 		local col = math.floor((ui.width - w) / 2)
-		wid = api.nvim_open_win(bid, true, {
+		wid = api.nvim_open_win(bid, config.current.window.focus, {
 			relative = "editor",
 			row = row,
 			col = col,
