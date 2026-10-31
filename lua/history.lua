@@ -26,33 +26,4 @@ function M.last()
 	return saved().last_args
 end
 
----@param arglead     string
----@param mode        "history"|"path"|"both"
----@return string[]
-function M.complete(arglead, mode)
-	local completions = {}
-	local seen = {}
-
-	if mode == "path" or mode == "both" then
-		for _, v in ipairs(vim.fn.getcompletion(arglead, "file")) do
-			if not seen[v] then
-				seen[v] = true
-				completions[#completions + 1] = v
-			end
-		end
-	end
-
-	if mode == "history" or mode == "both" then
-		local s = saved()
-		for _, old in ipairs(vim.iter(s.oldargs):rev():totable()) do
-			if old:sub(1, #arglead) == arglead and not seen[old] then
-				seen[old] = true
-				completions[#completions + 1] = old
-			end
-		end
-	end
-
-	return completions
-end
-
 return M

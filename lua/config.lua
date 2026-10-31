@@ -1,5 +1,4 @@
 ---@alias WinPosition "bottom" | "top" | "left" | "right" | "float"
----@alias CompMode "history" | "path" | "both"
 
 ---@class CrunWinOpts
 ---@field position WinPosition        window position
@@ -9,18 +8,16 @@
 ---@field focus    boolean            focus on window upon opening
 
 ---@class CrunOpts
----@field completion  CompMode        what completion to show
----@field timestamps  boolean         print start/finish banners like Emacs compile mode
----@field color       boolean         force color output from the child process
----@field window      CrunWinOpts     window options
----@field echo        boolean         echo the command inside the buffer
----@field queue       boolean         queue commands instead of asking to kill
+---@field timestamps boolean          print start/finish banners like Emacs compile mode
+---@field color      boolean          force color output from the child process
+---@field window     CrunWinOpts      window options
+---@field echo       boolean          echo the command inside the buffer
+---@field queue      boolean          queue commands instead of asking to kill
 
 local M = {}
 
 ---@type CrunOpts
 M.defaults = {
-	completion = "path",
 	timestamps = true,
 	color = true,
 	window = {
